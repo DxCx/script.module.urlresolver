@@ -30,14 +30,14 @@ import urllib
 class VideorajResolver(Plugin, UrlResolver, PluginSettings):
     implements = [UrlResolver, PluginSettings]
     name = "videoraj.ch"
-    domains = [ "videoraj.ec", "videoraj.eu", "videoraj.sx", "videoraj.ch", "videoraj.com" ]
+    domains = [ "videoraj.ec", "videoraj.eu", "videoraj.sx", "videoraj.ch", "videoraj.com" , "videoraj.to"]
 
     def __init__(self):
         p = self.get_setting('priority') or 100
         self.priority = int(p)
         self.net = Net()
 
-    def __get_stream_url(self, media_id, filekey, error_num=0, error_url=None):
+    def __get_stream_url(self, host, media_id, filekey, error_num=0, error_url=None):
         '''
         Get stream url. 
 
@@ -53,12 +53,7 @@ class VideorajResolver(Plugin, UrlResolver, PluginSettings):
             _error_params = ''
 
         #use api to find stream address
-        api_call = 'http://www.videoraj.ch/api/player.api.php?{0}&file={1}&key={2}{3}'.format(
-                        'user=undefined&pass=undefined',
-                        media_id,
-                        urllib.quote_plus(filekey).replace('.', '%2E'),
-                        _error_params
-                    )
+        api_call = '%s/api/player.api.php?%s&file=%s&key=%s%s' % (host, 'user=undefined&pass=undefined', media_id, urllib.quote_plus(filekey).replace('.', '%2E'), _error_params)
 
         api_html = self.net.http_GET(api_call).content
         rapi = re.search('url=(.+?)&title=', api_html)
@@ -87,7 +82,7 @@ class VideorajResolver(Plugin, UrlResolver, PluginSettings):
         stream_url = None
         # try to resolve 3 times then give up
         for x in range(0, 2):
-            link = self.__get_stream_url(media_id, filekey, 
+            link = self.__get_stream_url(host, media_id, filekey, 
                                     error_num=x,
                                     error_url=error_url)
 
@@ -110,10 +105,10 @@ class VideorajResolver(Plugin, UrlResolver, PluginSettings):
             raise UrlResolver.ResolverError('File Not Found or removed')
 
     def get_url(self, host, media_id):
-        return 'http://www.videoraj.ch/embed.php?id=%s' % media_id
+        return '%s/embed.php?id=%s' % (host, media_id)
 
     def get_host_and_id(self, url):
-        r = re.search('(https?://(?:www\.|embed\.)videoraj\.(?:ec|eu|sx|ch|com))/(?:v(?:ideo)*/|embed\.php\?id=)([0-9a-z]+)', url)
+        r = re.search('(https?://(?:www\.|embed\.)videoraj\.(?:ec|eu|sx|ch|com|to))/(?:v(?:ideo)*/|embed\.php\?id=)([0-9a-z]+)', url)
         if r:
             return r.groups()
         else:
@@ -121,4 +116,4 @@ class VideorajResolver(Plugin, UrlResolver, PluginSettings):
 
     def valid_url(self, url, host):
         if self.get_setting('enabled') == 'false': return False
-        return re.match('https?://(?:www\.|embed\.)videoraj\.(?:ec|eu|sx|ch|com)/(?:v(?:ideo)*/|embed\.php\?id=)([0-9a-z]+)', url) or 'videoraj' in host
+        return re.match('https?://(?:www\.|embed\.)videoraj\.(?:ec|eu|sx|ch|com|to)/(?:v(?:ideo)*/|embed\.php\?id=)([0-9a-z]+)', url) or 'videoraj' in host
