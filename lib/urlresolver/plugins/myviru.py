@@ -1,5 +1,5 @@
 '''
-okru urlresolver plugin
+myviru urlresolver plugin
 Copyright (C) 2015 DxCx
 
 This program is free software: you can redistribute it and/or modify
@@ -24,11 +24,11 @@ import re, os, xbmc, json
 import urllib
 from urlresolver import common
 
-class OkruResolver(Plugin,UrlResolver,PluginSettings):
+class MyViRuResolver(Plugin,UrlResolver,PluginSettings):
     implements=[UrlResolver,PluginSettings]
-    name="okru"
-    domains=[ "ok.ru" ]
-    pattern = '//((?:www\.)?ok\.ru)/videoembed/([0-9]+)'
+    name="myviru"
+    domains=[ "myvi.ru" ]
+    pattern = '//((?:www\.)?myvi\.ru)/player/embed/html/([0-9a-zA-Z\-_]+)'
 
     def __init__(self):
         p=self.get_setting('priority') or 100
@@ -37,24 +37,21 @@ class OkruResolver(Plugin,UrlResolver,PluginSettings):
 
     def get_media_url(self,host,media_id):
         full_url=self.get_url(host, media_id)
-        url=self.__get_info_url(host,media_id)
-        src=self.net.http_GET(url).content
-        js=json.loads(src)
-        videos=js["videos"]
+        src=self.net.http_GET(full_url).content
+        p=re.findall("dataUrl:'([^']+)'",src)[0]
+        js=json.loads(self.net.http_GET("http://%s%s" % (host, p)).content)
+        videos=js["sprutoData"]["playlist"]
         opts=[]
         for video in videos:
-            opts.append((video["name"], self.__resolve_video(host, video["url"], full_url)))
+            opts.append((video["title"], self.__resolve_url(video["video"][0]["url"], full_url)))
         return sorted(opts, key=lambda x:x[0])[0][1]
 
-    def __resolve_video(self, host, video_url, url):
-        headers = "Origin=http://%s&User-Agent=Mozilla/5.0 (Windows NT 6.1; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/28.0.1500.72 Safari/537.36" % host
-        return "%s|%s" % (video_url, headers)
-
-    def __get_info_url(self, host, media_id):
-        return "http://%s/dk?cmd=videoPlayerMetadata&mid=%s" % (host, media_id)
+    def __resolve_url(self, url, ref_url):
+        headers={'Referer':ref_url}
+        return self.net.http_HEAD(url, headers=headers).get_url()
 
     def get_url(self,host,media_id):
-        return 'http://%s/videoembed/%s'%(host, media_id)
+        return 'http://%s/player/embed/html/%s'%(host, media_id)
      
     def get_host_and_id(self, url):
         r = re.search(self.pattern, url)
@@ -64,4 +61,4 @@ class OkruResolver(Plugin,UrlResolver,PluginSettings):
     
     def valid_url(self, url, host):
         if self.get_setting('enabled') == 'false': return False
-        return re.search(self.pattern, url) or 'ok.ru' in host
+        return re.search(self.pattern, url) or 'myvi.ru' in host
