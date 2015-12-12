@@ -244,14 +244,21 @@ class NetworkInterface(Interface):
     Your plugin should inherent this interface if it uses networking operations.
     '''
     _NETWORK_PROVIDER = None
+    _EXISTING_INSTANCES = []
 
     def __init__(self):
         assert self._NETWORK_PROVIDER is not None, "Network provider was not set, class cannot be created"
         self.net = self._NETWORK_PROVIDER()
+        self._EXISTING_INSTANCES.append(self)
+
+    def __del__(self):
+        self._EXISTING_INSTANCES.remove(self)
 
     @classmethod
     def set_provider(cls, provider):
         cls._NETWORK_PROVIDER = provider
+        for obj in cls._EXISTING_INSTANCES:
+            obj.net = cls._NETWORK_PROVIDER()
 
     @classmethod
     def has_provider(cls):
