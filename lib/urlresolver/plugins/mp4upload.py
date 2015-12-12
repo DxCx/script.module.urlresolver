@@ -20,36 +20,25 @@
 import re
 from t0mm0.common.net import Net
 from urlresolver import common
-from urlresolver.plugnplay.interfaces import UrlResolver
-from urlresolver.plugnplay.interfaces import PluginSettings
+from urlresolver.plugnplay.interfaces import GenericUrlResolver, UrlResolver, PluginSettings
 from urlresolver.plugnplay import Plugin
 
-class Mp4uploadResolver(Plugin, UrlResolver, PluginSettings):
+class Mp4uploadResolver(Plugin, GenericUrlResolver):
     implements = [UrlResolver, PluginSettings]
     name = "mp4upload"
     domains = ["mp4upload.com"]
+    pattern='//(?:www\.)?(mp4upload.com)/embed-(.+?)\.'
+    url_template = 'http://%(host)s/embed-%(media_id)s.html'
 
     def __init__(self):
-        p = self.get_setting('priority') or 100
-        self.priority = int(p)
-        self.net = Net()
+        GenericUrlResolver.__init__(self)
 
     def get_media_url(self, host, media_id):
         web_url = self.get_url(host, media_id)
         link = self.net.http_GET(web_url).content
         link = ''.join(link.splitlines()).replace('\t', '')
-        videoUrl = re.compile('\'file\': \'(.+?)\'').findall(link)[0]
-        return videoUrl
+        r = re.search('\'file\': \'(.+?)\'', link)
+        if not r:
+            raise UrlResolver.ResolverError('could not find video')
 
-    def get_url(self, host, media_id):
-        return 'http://www.mp4upload.com/embed-%s.html' % media_id
-
-    def get_host_and_id(self, url):
-        r = re.search('//(.+?)/embed-(.+?)\.', url)
-        if r:
-            return r.groups()
-        else:
-            return False
-
-    def valid_url(self, url, host):
-        return 'mp4upload.com' in url or self.name in host
+        return r.groups(1)[0]

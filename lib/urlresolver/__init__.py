@@ -35,7 +35,9 @@ from types import HostedMediaFile
 from plugnplay.interfaces import UrlResolver, UrlWrapper
 from plugnplay.interfaces import PluginSettings
 from plugnplay.interfaces import SiteAuth
+from plugnplay.interfaces import NetworkInterface
 import xbmcgui
+from t0mm0.common.net import Net
 
 #load all available plugins
 common.addon.log('Initializing URLResolver version: %s' % common.addon_version)
@@ -43,7 +45,14 @@ plugnplay.set_plugin_dirs(common.plugins_path)
 
 MAX_SETTINGS = 75
 
+def set_network_provider(provider):
+    NetworkInterface.set_provider(provider)
+
 def lazy_plugin_scan():
+    # Use t0mm0 network stack if nothing was set before resolve
+    if not NetworkInterface.has_provider():
+        set_network_provider(Net)
+
     if not UrlResolver.implementors():
         plugnplay.scan_plugins(UrlWrapper)
 

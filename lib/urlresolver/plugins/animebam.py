@@ -16,60 +16,40 @@ You should have received a copy of the GNU General Public License
 along with this program. If not, see <http://www.gnu.org/licenses/>.
 '''
 
-from t0mm0.common.net import Net
-from urlresolver.plugnplay.interfaces import UrlResolver
-from urlresolver.plugnplay.interfaces import PluginSettings
 from urlresolver.plugnplay import Plugin
-import re, os, xbmc, json
+from urlresolver.plugnplay.interfaces import GenericUrlResolver, UrlResolver, PluginSettings
 from urlresolver import common
+import re
 
-class AnimebamResolver(Plugin,UrlResolver,PluginSettings):
-    implements=[UrlResolver,PluginSettings]
+class AnimebamResolver(Plugin, GenericUrlResolver):
+    implements=[UrlResolver, PluginSettings]
     name="animebam"
     domains=[ "animebam.com" ]
+    pattern='//(?:www\.)?(animebam.com)/(?:embed\/)?([0-9a-zA-Z]+)'
+    url_template = 'http://%(host)s/embed/%(media_id)s'
 
     def __init__(self):
-        p=self.get_setting('priority') or 100
-        self.priority=int(p)
-        self.net=Net()
+        GenericUrlResolver.__init__(self)
 
     def get_media_url(self,host,media_id):
-        url=self.get_url1st(host,media_id)
+        url=self.get_url(host,media_id)
         headers={'User-Agent':common.IE_USER_AGENT,'Referer':url}
         html=self.net.http_GET(url,headers=headers).content
-        video_url = self.__get_best_source(html)
-        if not video_url:
+        videos = self.__get_videos(html, url)
+        if not len(videos):
             raise UrlResolver.ResolverError('could not find video')
-        return self.__resolve_video(video_url, url)
 
-    def __resolve_video(self, video_url, url):
-        headers={'Referer':url}
+        return sorted(videos, key=lambda k: k[0])[0][1]
+
+    def _resolve(self, video_url, refer):
+        headers={'Referer':refer}
         return self.net.http_HEAD(video_url, headers=headers).get_url()
 
-    def __get_best_source(self, html):
+    def __get_videos(self, html, refer):
         mirrorlist = []
         r=re.search('sources:\s*\[\{(.+)\}\]', html, re.DOTALL)
         if not r:
             return None
 
         mirrors=re.findall('file:\s"(.+?)",\slabel:\s"(.+?)"', r.group(1), re.DOTALL)
-        mirrorlist = [(i[1], i[0]) for i in mirrors]
-        # TODO: in the future return all.
-        return sorted(mirrorlist, key=lambda k: k[0])[0][1]
-
-    def get_url(self,host,media_id):
-        return 'http://%s/%s'%(host, media_id)
-
-    def get_url1st(self,host,media_id):
-        return 'http://%s/embed/%s'%(host, media_id)
-
-    def get_host_and_id(self, url):
-        r=re.search('//(?:www\.)?(animebam.com)/(?:embed\/)?([0-9a-zA-Z]+)',url)
-        if r: return r.groups()
-        else: return False
-        return('host','media_id')
-
-    def valid_url(self,url,host):
-        if self.get_setting('enabled')=='false': return False
-        return (re.match('http://(?:www.)?(animebam.com)/(?:embed\/)?([0-9A-Za-z]+)',url) or 'animebam' in host)
-
+        return [(i[1], self._resolve(i[0], refer)) for i in mirrors]

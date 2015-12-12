@@ -38,8 +38,9 @@ import urlresolver
 from urlresolver import common
 from urlresolver.plugnplay import Interface, AutoloadPlugin
 import sys, re
-from fnmatch import translate
 import xbmcaddon
+import re
+from fnmatch import translate
 
 addon = xbmcaddon.Addon('script.module.urlresolver')
 
@@ -238,6 +239,24 @@ class UrlResolver(Interface):
     	return False
 
 
+class NetworkInterface(Interface):
+    '''
+    Your plugin should inherent this interface if it uses networking operations.
+    '''
+    _NETWORK_PROVIDER = None
+
+    def __init__(self):
+        assert self._NETWORK_PROVIDER is not None, "Network provider was not set, class cannot be created"
+        self.net = self._NETWORK_PROVIDER()
+
+    @classmethod
+    def set_provider(cls, provider):
+        cls._NETWORK_PROVIDER = provider
+
+    @classmethod
+    def has_provider(cls):
+        return cls._NETWORK_PROVIDER is not None
+
 
 class SiteAuth(Interface):
     '''
@@ -254,7 +273,6 @@ class SiteAuth(Interface):
         to a web page which will set cookies. 
         '''
         not_implemented(self)
-
 
 
 class PluginSettings(Interface):
@@ -362,6 +380,7 @@ class PluginSettings(Interface):
 class UrlStub(UrlResolver, PluginSettings, SiteAuth):
     pass
 
+
 class UrlWrapper(UrlResolver, PluginSettings, SiteAuth, AutoloadPlugin):
     _ref = UrlStub()
     implements = []
@@ -407,4 +426,66 @@ class UrlWrapper(UrlResolver, PluginSettings, SiteAuth, AutoloadPlugin):
     @classmethod
     def implementors(klass):
         return UrlResolver.implementors()
+
+
+class GenericUrlResolver(NetworkInterface, UrlResolver, PluginSettings):
+    '''
+    Generic implementation of UrlResolver.
+    '''
+
+    def __init__(self):
+        NetworkInterface.__init__(self)
+        p = self.get_setting('priority') or 100
+        self.priority = int(p)
+
+    def get_host_and_id(self, url):
+        r=re.search(self.pattern, url)
+        if r: return r.groups()
+        else: return False
+
+    def valid_url(self,url,host):
+        if self.get_setting('enabled')=='false': return False
+        r=re.search(self.pattern, url)
+        return True if r else False
+
+    def get_url(self,host,media_id):
+        return self.url_template % {'host': host, 'media_id': media_id}
+
+    @property
+    def implements(self):
+        '''
+        should be overrided for lazy plugin scanner
+        should contain a list
+        default value is [UrlResolver, PluginSettings]
+        '''
+        not_implemented(self)
+
+    @property
+    def name(self):
+        '''
+        should be overrided for lazy plugin scanner
+        should contain a simple string with resolver name
+        '''
+        not_implemented(self)
+
+    @property
+    def domains(self):
+        '''
+        should be overrided for lazy plugin scanner
+        should contain a list with domains of the resolver
+        '''
+        not_implemented(self)
+
+    @property
+    def pattern(self):
+        ' should contain resolver generic regex pattern '
+        not_implemented(self)
+
+    @property
+    def url_template(self):
+        '''
+        should contain resolver generic template for building url,
+        example: http://%(host)s/%(media_id)
+        '''
+        not_implemented(self)
 
